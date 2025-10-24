@@ -1,0 +1,131 @@
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv('xg_model.csv')
+df.head()
+df.shape
+df.x.mean()
+df.columns
+
+df.drop(['DirectFreekick', 'DirectCorner'], axis=1, inplace=True)
+
+df.columns
+
+df.OwnGoal.value_counts()
+
+df = df[df['OwnGoal'] != True]
+df.drop('OwnGoal', axis=1, inplace=True)
+df.shape
+df.is_goal.value_counts()
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+plt.figure(figsize=(10,6))
+
+sns.scatterplot(x='x', y='y', data=df, hue='is_goal', alpha=.5)
+
+df.isna().sum()
+
+df.fillna(0, inplace=True)
+
+df.dtypes
+
+df = df.astype({
+    'x': float,
+    'y': float,
+    'is_goal': bool,
+    'period': str,
+    'Assisted': bool,
+    'Zone': str,
+    'IndividualPlay': bool,
+    'RegularPlay': bool,
+    'LeftFoot': bool,
+    'RightFoot': bool,
+    'FromCorner': bool,
+    'FirstTouch': bool,
+    'Head': bool,
+    'BigChance': bool,
+    'SetPiece': bool,
+    'Volley': bool,
+    'FastBreak': bool,
+    'ThrowinSetPiece': bool,
+    'Penalty': bool,
+    'OneOnOne': bool,
+    'KeyPass': bool,
+    'OtherBodyPart': bool    
+})
+
+df.dtypes
+
+df['shot_distance'] = np.sqrt((df['x'] -100)**2 + (df['y'] -50)**2)
+
+df.shot_distance
+
+df['shot_distance'].hist()
+
+df['shot_distance'].describe()
+
+df.period.value_counts()
+
+df = pd.get_dummies(df, columns=['period', 'Zone'])
+
+df.columns
+
+df.period_FirstHalf.value_counts()
+
+df.period_SecondHalf.value_counts()
+
+X = df.drop('is_goal', axis=1)
+y = df['is_goal']
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=42)
+
+model = LogisticRegression(max_iter=1000)
+
+model.fit(X_train, y_train)
+
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+
+y_pred_proba[:10]
+
+final_df = X_test.copy()
+final_df['goal_probability'] = y_pred_proba
+
+final_df.iloc[90]
+
+final_df.sort_values(by='goal_probability', ascending=False).head()
+
+log_loss(y_test, y_pred_proba)
+
+roc_auc_score(y_test, y_pred_proba)
+
+brier_score_loss(y_test, y_pred_proba)
+
+from mplsoccer import Pitch
+pitch = Pitch(pitch_type='opta')
+
+from matplotlib.colors import LinearSegmentedColormap
+colors = ['red', 'yellow', 'green']
+
+cmap = LinearSegmentedColormap.from_list('my_colormap', colors)
+
+fig, ax = pitch.draw(figsize=(10,8))
+
+sc = pitch.scatter(
+    final_df['x'],
+    final_df['y'],
+    c=final_df['goal_probability'],
+    cmap=cmap,
+    edgecolors='black',
+    linewidth=.5,
+    s=100,
+    ax=ax
+)
+
+cbar = plt.colorbar(sc, ax=ax, orientation='vertical', fraction=.02, pad=.02)
+cbar.set_label('xG probability')
